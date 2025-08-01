@@ -1,6 +1,7 @@
 // Namespaces que nosso arquivo vai usar.
 namespace OrionHealth.Application.UseCases.ReceiveOruR01;
 
+using OrionHealth.Application.Interfaces;
 using OrionHealth.Application.Interfaces.Persistence;
 using OrionHealth.Application.UseCases.ReceiveOruR01.Interfaces;
 using System.Threading.Tasks; // Necessário para usar Task

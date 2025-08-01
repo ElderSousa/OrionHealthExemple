@@ -1,8 +1,11 @@
+namespace OrionHealth.CrossCutting;
+
 // Namespaces que vamos usar. O primeiro é para a DI, o segundo para Configuração,
 // e os outros são para acessar nossas próprias classes e interfaces.
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Configuration;
 using OrionHealth.Application.Interfaces.Persistence;
+using OrionHealth.Application.Interfaces;
 using OrionHealth.Infrastructure.Persistence;
 using OrionHealth.Infrastructure.Persistence.Context;
 using Microsoft.EntityFrameworkCore;
@@ -10,7 +13,6 @@ using Oracle.ManagedDataAccess.Client;
 using System.Data;
 using OrionHealth.Application.UseCases.ReceiveOruR01.Interfaces;
 using OrionHealth.Application.UseCases.ReceiveOruR01;
-using OrionHealth.Application.Interfaces;
 //using OrionHealth.Infrastructure.HL7; // Vamos criar isso na próxima sessão!
 
 // 'static class' é uma classe que não pode ser instanciada (não se pode fazer 'new DependencyInjection()').
@@ -78,7 +80,7 @@ public static class DependencyInjection
         // AddSingleton: Diz ao .NET para criar UMA ÚNICA instância de 'HapiParser' e reutilizá-la
         // durante toda a vida da aplicação. Isso é bom para classes que não guardam estado
         // e são caras para criar, como um parser.
-        //services.AddSingleton<IHL7Parser, HapiParser>();
+        services.AddSingleton<IHL7Parser, HapiParser>();
 
         return services;
     }

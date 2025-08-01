@@ -1,6 +1,6 @@
 using OrionHealth.Domain.Entities;
 
-namespace OrionHealth.Application.Interfaces.Persistence;
+namespace OrionHealth.Application.Interfaces;
 
 public interface IHL7Parser
 {

@@ -1,0 +1,34 @@
+
+services:
+
+  # --- NOSSA APLICAÇÃO .NET ---
+  orion-health-hub:
+    # 'build: .' instrui o Docker a construir uma imagem usando o Dockerfile
+    # que está nesta mesma pasta.
+    build: .
+    # 'depends_on' garante que o contêiner do banco de dados (oracle-db)
+    # será iniciado ANTES do contêiner da nossa aplicação.
+    ports:
+      - "1080:1080"
+    depends_on:
+      - oracle-db
+    environment:
+      # AQUI ESTÁ A MÁGICA DA CONEXÃO:
+      # Passamos a ConnectionString como uma variável de ambiente para o contêiner.
+      # Note que o 'Data Source' não é 'localhost', mas sim 'oracle-db',
+      # que é o nome do serviço do banco de dados. Dentro da rede do Docker,
+      # os contêineres se comunicam pelos nomes dos serviços.
+      - ConnectionStrings__OracleConnection=User Id=system;Password=your_strong_password;Data Source=oracle-db:1521/XEPDB1;
+
+  # --- BANCO DE DADOS ORACLE ---
+  oracle-db:
+    image: gvenzl/oracle-xe:latest
+    ports:
+      - "1521:1521"
+    environment:
+      - ORACLE_PASSWORD=your_strong_password
+    volumes:
+      - oracle_data:/opt/oracle/oradata
+
+volumes:
+  oracle_data:

@@ -6,11 +6,11 @@
 using NHapi.Base.Model;
 using NHapi.Base.Parser;
 using NHapi.Base.Util;
-using NHapi.Model.V251.Group;
+using NHapi.Model.V251.Group; 
 using NHapi.Model.V251.Message;
 
 // Usings dos nossos próprios projetos, para acessar interfaces e entidades.
-using OrionHealth.Application.Interfaces.Persistence;
+using OrionHealth.Application.Interfaces;
 using OrionHealth.Domain.Entities;
 
 // Usings padrões do .NET para funcionalidades gerais.
@@ -62,21 +62,21 @@ public class HapiParser : IHL7Parser
             var terserAck = new Terser(ack);
 
             // 5. Preenchemos o cabeçalho (segmento MSH) da nossa resposta.
-            // Trocamos as informações de remetente e destinatário.
-            terserAck.Set("MSH-3-1", terserOriginal.Get("MSH-5-1")); // Receiving App -> Sending App
-            terserAck.Set("MSH-4-1", terserOriginal.Get("MSH-6-1")); // Receiving Facility -> Sending Facility
-            terserAck.Set("MSH-5-1", terserOriginal.Get("MSH-3-1")); // Sending App -> Receiving App
-            terserAck.Set("MSH-6-1", terserOriginal.Get("MSH-4-1")); // Sending Facility -> Receiving Facility
-            // MSH-7: Data e hora da nossa mensagem. Formatamos como o HL7 espera.
-            terserAck.Set("MSH-7-1", DateTime.Now.ToString("yyyyMMddHHmmss"));
-            // MSH-9: O tipo da mensagem. É uma ACK.
-            terserAck.Set("MSH-9-1", "ACK");
-            // MSH-10: O ID de controle da nossa mensagem. Geramos um novo e único.
-            terserAck.Set("MSH-10-1", Guid.NewGuid().ToString("N").Substring(0, 20));
-            // MSH-11: Código de processamento. 'P' para Produção.
-            terserAck.Set("MSH-11-1", "P");
-            // MSH-12: Versão do HL7.
-            terserAck.Set("MSH-12-1", "2.5.1");
+            // A lógica aqui é "inverter o envelope" da mensagem original e
+            // gerar novas informações de controle para a nossa resposta.
+            
+            // Invertendo Remetente e Destinatário:
+            terserAck.Set("MSH-3-1", terserOriginal.Get("MSH-5-1")); // Nosso App (que era o Destinatário) agora é o Remetente.
+            terserAck.Set("MSH-4-1", terserOriginal.Get("MSH-6-1")); // Nossa Unidade (que era a Destinatária) agora é a Remetente.
+            terserAck.Set("MSH-5-1", terserOriginal.Get("MSH-3-1")); // O App original (que era o Remetente) agora é o Destinatário.
+            terserAck.Set("MSH-6-1", terserOriginal.Get("MSH-4-1")); // A Unidade original (que era a Remetente) agora é a Destinatária.
+            
+            // Gerando Informações Novas para o nosso ACK:
+            terserAck.Set("MSH-7-1", DateTime.Now.ToString("yyyyMMddHHmmss")); // MSH-7: O carimbo de tempo da nossa resposta.
+            terserAck.Set("MSH-9-1", "ACK");                                    // MSH-9: O tipo da nossa mensagem é uma Confirmação.
+            terserAck.Set("MSH-10-1", Guid.NewGuid().ToString("N").Substring(0, 20)); // MSH-10: Um novo "número de rastreio" único para nosso ACK.
+            terserAck.Set("MSH-11-1", "P");                                    // MSH-11: Estamos em ambiente de Produção.
+            terserAck.Set("MSH-12-1", "2.5.1");                                // MSH-12: Nossa resposta segue a versão 2.5.1 do HL7.
 
             // 6. Preenchemos o segmento de status da mensagem (MSA).
             // MSA-1: Código de confirmação. "AA" significa "Application Accept" (Sucesso).
@@ -142,61 +142,116 @@ public class HapiParser : IHL7Parser
         }
     }
 
-    // ----------------------------------------------------------------------------------
-    // MÉTODO: ParseOruR01 - O coração do parser. Extrai os dados.
-    // ----------------------------------------------------------------------------------
+    // ####################################################################################
+    // # MÉTODO: ParseOruR01 - O coração do parser. Extrai os dados.                      #
+    // # Esta é a versão final e mais robusta, que acessa os dados diretamente.          #
+    // ####################################################################################
+
     /// <summary>
     /// Faz o parse de uma mensagem ORU_R01 e extrai os dados do paciente e dos resultados.
+    /// Este método usa parâmetros 'out', o que significa que ele vai "preencher" as variáveis
+    /// 'patient' e 'results' que forem passadas para ele, em vez de retornar um único valor.
     /// </summary>
     /// <param name="hl7Message">A mensagem ORU_R01 em formato de texto.</param>
-    /// <param name="patient">O objeto Paciente que será preenchido.</param>
-    /// <param name="results">A lista de Resultados que será preenchida.</param>
+    /// <param name="patient">O objeto Paciente que será preenchido (saída).</param>
+    /// <param name="results">A lista de Resultados que será preenchida (saída).</param>
     public void ParseOruR01(string hl7Message, out Patient patient, out List<ObservationResult> results)
     {
-        // Fazemos o parse e garantimos que a mensagem é do tipo ORU_R01.
+        // ####################################################################################
+        // # 1. O Parse Inicial                                                               #
+        // ####################################################################################
+        // Usamos o parser do NHapi para converter o texto da mensagem em um objeto HL7.
+        // 'as ORU_R01' tenta converter ("cast") o objeto para o tipo específico que esperamos.
+        // O operador '??' (null-coalescing) é um atalho para: "Se a conversão falhar e o resultado
+        // for nulo, lance uma exceção imediatamente". Isso garante que só continuaremos se a
+        // mensagem for realmente do tipo ORU_R01.
         var oruMessage = _parser.Parse(hl7Message) as ORU_R01
             ?? throw new ArgumentException("A mensagem fornecida não é um ORU_R01 válido.");
 
-        var terser = new Terser(oruMessage);
+        // ####################################################################################
+        // # 2. Acesso Direto aos Segmentos                                                   #
+        // ####################################################################################
+        // Navegamos diretamente na estrutura do objeto que o NHapi criou. Esta é a forma
+        // mais segura e recomendada, pois evita os erros que tivemos com o Terser.
+        // O caminho 'GetPATIENT_RESULT().PATIENT.PID' nos dá acesso direto ao segmento PID
+        // (Patient Identification), que contém os dados demográficos do paciente.
+        var pidSegment = oruMessage.GetPATIENT_RESULT().PATIENT.PID;
 
-        // Preenchemos nosso objeto de domínio 'Patient' usando o Terser para buscar os dados.
-        // A sintaxe com "/" é um "caminho" dentro da estrutura da mensagem HL7.
+        // ####################################################################################
+        // # 3. Preenchendo os Dados do Paciente                                              #
+        // ####################################################################################
+        // Criamos um novo objeto 'Patient' do nosso domínio, que será preenchido a seguir.
         patient = new Patient
         {
-            MedicalRecordNumber = terser.Get("/PATIENT_RESULT/PATIENT/PID-3-1"),
-            FullName = $"{terser.Get("/PATIENT_RESULT/PATIENT/PID-5-1")} {terser.Get("/PATIENT_RESULT/PATIENT/PID-5-2")}",
-            DateOfBirth = ParseHl7Date(terser.Get("/PATIENT_RESULT/PATIENT/PID-7-1"))
+            // PID-3 (Patient Identifier List): Este campo pode se repetir.
+            // 'GetPatientIdentifierList()' nos retorna a lista de todos os identificadores.
+            // '.FirstOrDefault()' pega o primeiro item da lista (ou nulo, se a lista estiver vazia).
+            // O operador '?.' (null-conditional) é uma segurança: "Se FirstOrDefault não for nulo,
+            // continue para pegar o IDNumber. Se for nulo, a expressão inteira se torna nula".
+            // O operador '??' (null-coalescing) é a segurança final: "Se a expressão inteira
+            // resultar em nulo, use uma string vazia como valor padrão".
+            MedicalRecordNumber = pidSegment.GetPatientIdentifierList().FirstOrDefault()?.IDNumber.Value ?? string.Empty,
+
+            // PID-5 (Patient Name): Este campo também pode se repetir (para nomes alternativos).
+            // 'GetPatientName(0)' pega o primeiro e principal nome do paciente.
+            // Em seguida, acessamos as partes do nome (FamilyName, GivenName) e as concatenamos.
+            FullName = pidSegment.GetPatientName(0).FamilyName.Surname.Value + " " + pidSegment.GetPatientName(0).GivenName.Value,
+
+            // PID-7 (Date/Time of Birth): Acessamos o campo de data de nascimento.
+            // O NHapi nos dá a data como uma 'string' no campo '.Time.Value'.
+            // Nós DEVEMOS usar nosso método auxiliar 'ParseHl7Date' para converter essa string
+            // para um objeto DateTime? de forma segura.
+            DateOfBirth = ParseHl7Date(pidSegment.DateTimeOfBirth.Time.Value)
         };
 
+        // ####################################################################################
+        // # 4. Preparando a Lista de Resultados                                              #
+        // ####################################################################################
+        // Inicializamos a lista que guardará todos os resultados de exame encontrados na mensagem.
         results = new List<ObservationResult>();
 
-        // Esta é a forma correta e final de iterar sobre grupos que se repetem.
-        // Pegamos a referência para o grupo PATIENT_RESULT.
-        var patientResult = oruMessage.GetPATIENT_RESULT();
+        // ####################################################################################
+        // # 5. Iterando sobre os Resultados                                                  #
+        // ####################################################################################
+        // Usamos um laço 'for' clássico, que é a maneira fundamental e garantida de
+        // iterar sobre grupos que se repetem no NHapi.
 
-        // Usamos um laço 'for' para percorrer todos os grupos de "ordem de exame".
-        for (int i = 0; i < patientResult.ORDER_OBSERVATIONRepetitionsUsed; i++)
+        // 'oruMessage.GetPATIENT_RESULT().ORDER_OBSERVATIONRepetitionsUsed' nos diz QUANTOS
+        // grupos de "ordem de exame" existem na mensagem.
+        for (int i = 0; i < oruMessage.GetPATIENT_RESULT().ORDER_OBSERVATIONRepetitionsUsed; i++)
         {
-            // Pegamos a ordem de exame na posição 'i'.
-            var orderObservation = patientResult.GetORDER_OBSERVATION(i);
-
-            // Dentro de cada ordem, usamos outro laço 'for' para percorrer os resultados.
+            // 'GetORDER_OBSERVATION(i)' nos dá o grupo específico na posição 'i' do laço.
+            var orderObservation = oruMessage.GetPATIENT_RESULT().GetORDER_OBSERVATION(i);
+            
+            // Dentro de cada ordem, pode haver múltiplos resultados (observações).
+            // Repetimos a mesma lógica de laço 'for' para o grupo de observação.
             for (int j = 0; j < orderObservation.OBSERVATIONRepetitionsUsed; j++)
             {
-                // Pegamos o resultado na posição 'j'.
+                // Pegamos o grupo de observação específico na posição 'j'.
                 var observation = orderObservation.GetOBSERVATION(j);
-                // E de dentro dele, pegamos o segmento OBX, que contém os dados que queremos.
+                // E de dentro dele, pegamos o segmento OBX, que contém os dados que realmente queremos.
                 var obx = observation.OBX;
 
-                // Criamos nosso objeto de domínio e o adicionamos à lista de resultados.
+                // ####################################################################################
+                // # 6. Preenchendo os Dados do Resultado do Exame                                    #
+                // ####################################################################################
+                // Com os dados do segmento OBX em mãos, criamos um novo objeto 'ObservationResult'
+                // do nosso domínio e o adicionamos à nossa lista de resultados.
                 results.Add(new ObservationResult
                 {
+                    // OBX-3: Identificador do Exame (ex: "GLUC" para Glicose).
                     ObservationId = obx.ObservationIdentifier.Identifier.Value,
+                    // OBX-3: Texto do Exame (ex: "Nível de Glicose Sanguínea").
                     ObservationText = obx.ObservationIdentifier.Text.Value,
+                    // OBX-5: O valor do resultado. 'GetObservationValue(0).Data' pega o primeiro
+                    // valor do resultado. Convertemos para string de forma segura com '?? string.Empty'.
                     ObservationValue = obx.GetObservationValue(0).Data.ToString() ?? string.Empty,
+                    // OBX-6: As unidades do resultado (ex: "mg/dL").
                     Units = obx.Units.Text.Value,
-                    // Usamos nosso método auxiliar para converter a data de forma segura.
-                    ObservationDateTime = ParseHl7Date(obx.DateTimeOfTheObservation.Time.Value.ToString()),
+                    // OBX-14: A data/hora da observação. Usamos nosso helper 'ParseHl7Date' para
+                    // converter a string de data que o NHapi nos fornece.
+                    ObservationDateTime = ParseHl7Date(obx.DateTimeOfTheObservation.Time.Value),
+                    // OBX-11: O status do resultado (ex: "F" para Final, "C" para Corrigido).
                     Status = obx.ObservationResultStatus.Value
                 });
             }
