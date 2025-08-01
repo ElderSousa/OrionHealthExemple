@@ -1,0 +1,50 @@
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.sln.docstates
+
+
+# Build outputs
+bin/
+obj/
+
+# Docker temporários e arquivos gerados
+obj/Docker/
+docker-compose.dcproj
+
+# Logs
+*.log
+
+# Arquivos de debug
+*.pdb
+*.dll
+*.exe
+
+# Copilot temporários
+*.db-shm
+*.db-wal
+
+# Localizações
+bin/**/pt-BR/
+bin/**/de/
+bin/**/es/
+bin/**/fr/
+bin/**/it/
+bin/**/ja/
+bin/**/ko/
+bin/**/pl/
+bin/**/ru/
+bin/**/tr/
+bin/**/zh-Hans/
+bin/**/zh-Hant/
+
+# Ignorar diretórios de build temporários
+**/bin/
+**/obj/
+.vs/
+*.user
+*.suo
+*.cache
+*.log
+Properties/launchSettings.json
