@@ -10,6 +10,11 @@ services:
     # será iniciado ANTES do contêiner da nossa aplicação.
     ports:
       - "1080:1080"
+      # ### ADICIONE ESTA SEÇÃO DE VOLUMES ###
+    volumes:
+      # Mapeia o arquivo do certificado da sua máquina para dentro do contêiner
+      # O ':ro' no final significa "read-only" (apenas leitura), uma boa prática de segurança.
+      - ./certs/orionhealth.pfx:/app/certs/orionhealth.pfx:ro
     depends_on:
       - oracle-db
     environment:
@@ -18,7 +23,7 @@ services:
       # Note que o 'Data Source' não é 'localhost', mas sim 'oracle-db',
       # que é o nome do serviço do banco de dados. Dentro da rede do Docker,
       # os contêineres se comunicam pelos nomes dos serviços.
-      - ConnectionStrings__OracleConnection=User Id=system;Password=your_strong_password;Data Source=oracle-db:1521/XEPDB1;
+      - ConnectionStrings__OracleConnection=User Id=orionhealth;Password=oracle;Data Source=oracle-db:1521/XEPDB1;
 
   # --- BANCO DE DADOS ORACLE ---
   oracle-db:
@@ -26,7 +31,7 @@ services:
     ports:
       - "1521:1521"
     environment:
-      - ORACLE_PASSWORD=your_strong_password
+      - ORACLE_PASSWORD=oracle
     volumes:
       - oracle_data:/opt/oracle/oradata
 

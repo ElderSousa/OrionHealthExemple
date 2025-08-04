@@ -12,7 +12,7 @@
 # ####################################################################################
 # 'FROM' define a imagem base. Começamos com a imagem oficial do .NET SDK 8.0,
 # que contém todas as ferramentas necessárias para compilar nosso código.
-FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 
 # 'WORKDIR' cria um diretório de trabalho chamado '/app' dentro do contêiner.
 # É a nossa "mesa de trabalho" virtual.
@@ -21,7 +21,6 @@ WORKDIR /app
 # 'COPY' copia arquivos da sua máquina para dentro do contêiner.
 # Para otimizar o cache do Docker, primeiro copiamos apenas os arquivos que
 # definem a estrutura e as dependências do projeto.
-COPY OrionHealth.sln .
 COPY src/OrionHealth.Application/OrionHealth.Application.csproj src/OrionHealth.Application/
 COPY src/OrionHealth.CrossCutting/OrionHealth.CrossCutting.csproj src/OrionHealth.CrossCutting/
 COPY src/OrionHealth.Domain/OrionHealth.Domain.csproj src/OrionHealth.Domain/
@@ -31,7 +30,10 @@ COPY src/OrionHealth.Worker/OrionHealth.Worker.csproj src/OrionHealth.Worker/
 # 'RUN dotnet restore' lê o arquivo de solução (.sln) e baixa todos os pacotes NuGet
 # necessários para todos os projetos. Como fazemos isso antes de copiar o resto do código,
 # o Docker guardará essa camada em cache, acelerando builds futuros.
-RUN dotnet restore
+# <<< MUDANÇA AQUI >>>
+# Restaura as dependências focando apenas no projeto Worker.
+# Ele irá restaurar transitivamente todos os outros projetos da aplicação.
+RUN dotnet restore src/OrionHealth.Worker/OrionHealth.Worker.csproj
 
 # Agora que as dependências foram restauradas, copiamos todo o resto do código fonte
 # (os arquivos .cs) para a estrutura de pastas correspondente dentro do contêiner.
@@ -48,7 +50,7 @@ RUN dotnet publish -c Release -o out src/OrionHealth.Worker/OrionHealth.Worker.c
 # ####################################################################################
 # Começamos de novo com uma imagem base muito menor, a 'runtime'.
 # Ela tem apenas o necessário para EXECUTAR a aplicação, tornando nossa imagem final leve.
-FROM mcr.microsoft.com/dotnet/runtime:9.0
+FROM mcr.microsoft.com/dotnet/runtime:8.0
 
 # Definimos o mesmo diretório de trabalho na nossa nova imagem limpa.
 WORKDIR /app

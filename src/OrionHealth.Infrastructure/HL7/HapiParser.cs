@@ -37,63 +37,71 @@ public class HapiParser : IHL7Parser
     // ----------------------------------------------------------------------------------
     // MÉTODO: CreateAck - Cria uma mensagem de confirmação de SUCESSO.
     // ----------------------------------------------------------------------------------
-    /// <summary>
-    /// Gera uma mensagem de confirmação positiva (ACK - Acknowledgment).
-    /// </summary>
-    /// <param name="originalMessage">A mensagem original recebida.</param>
-    /// <returns>Uma string contendo a mensagem ACK no formato HL7.</returns>
-    public string CreateAck(string originalMessage)
+/// <summary>
+/// Gera uma mensagem de confirmação positiva (ACK) de forma robusta.
+/// Esta versão constrói a mensagem usando as propriedades fortemente tipadas
+/// dos objetos do NHapi, o que é mais seguro que usar o Terser.
+/// </summary>
+/// <param name="originalMessage">A mensagem original recebida.</param>
+/// <returns>Uma string contendo a mensagem ACK perfeitamente formatada.</returns>
+public string CreateAck(string originalMessage)
+{
+    // O bloco 'try' garante que, se a mensagem original for inválida,
+    // a aplicação não irá quebrar ao tentar processá-la.
+    try
     {
-        // Usamos um bloco try-catch como rede de segurança. Se algo der errado
-        // ao processar a mensagem original, não quebramos a aplicação.
-        try
-        {
-            // 1. Fazemos o "parse" da mensagem original de texto para um objeto HL7.
-            var original = _parser.Parse(originalMessage);
-            // 2. Criamos um objeto "Terser", que é uma ferramenta poderosa do NHapi
-            // para "pescar" (Get) ou "definir" (Set) valores em campos específicos.
-            var terserOriginal = new Terser(original);
-            // 3. Pescamos o ID de controle da mensagem original (campo MSH-10).
-            // Precisamos devolver esse mesmo ID na nossa resposta.
-            var originalMessageControlId = terserOriginal.Get("MSH-10-1");
+        // 1. Parse da Mensagem Original
+        // Converte a string da mensagem original em um objeto HL7.
+        var original = _parser.Parse(originalMessage);
+        // Cria um 'Terser' para facilitar a "pesca" de campos da mensagem original.
+        var terserOriginal = new Terser(original);
+        // Cria um objeto 'ACK' vazio, que é a estrutura da nossa resposta.
+        var ack = new ACK();
 
-            // 4. Criamos um objeto ACK vazio e um Terser para ele.
-            var ack = new ACK();
-            var terserAck = new Terser(ack);
+        // --- 2. Construindo o Segmento MSH Diretamente ---
+        // Pega uma referência direta para o segmento MSH do nosso objeto ACK.
+        var msh = ack.MSH;
+        // MSH-9: Define o tipo da mensagem como "ACK".
+        msh.MessageType.MessageCode.Value = "ACK";
+        // Invertendo Remetente e Destinatário:
+        // MSH-3 (Nosso Remetente) recebe o valor do MSH-5 (Destinatário) original.
+        msh.SendingApplication.NamespaceID.Value = terserOriginal.Get("MSH-5-1");
+        // MSH-4 (Nossa Unidade Remetente) recebe o valor do MSH-6 (Unidade Destinatária) original.
+        msh.SendingFacility.NamespaceID.Value = terserOriginal.Get("MSH-6-1");
+        // MSH-5 (Nosso Destinatário) recebe o valor do MSH-3 (Remetente) original.
+        msh.ReceivingApplication.NamespaceID.Value = terserOriginal.Get("MSH-3-1");
+        // MSH-6 (Nossa Unidade Destinatária) recebe o valor do MSH-4 (Unidade Remetente) original.
+        msh.ReceivingFacility.NamespaceID.Value = terserOriginal.Get("MSH-4-1");
+        // MSH-7: Define a data e hora da mensagem com o valor atual, já no formato HL7 correto.
+        msh.DateTimeOfMessage.Time.SetLongDateWithSecond(DateTime.Now);
+        // MSH-10: Cria um novo ID de controle único para a nossa mensagem de ACK.
+        msh.MessageControlID.Value = Guid.NewGuid().ToString().Substring(0, 20);
+        // MSH-11: Define o código de processamento como "P" (Produção).
+        msh.ProcessingID.ProcessingID.Value = "P";
+        // MSH-12: Define a versão do HL7 como "2.5.1".
+        msh.VersionID.VersionID.Value = "2.5.1";
+        
+        // --- 3. Construindo o Segmento MSA Diretamente ---
+        // Pega uma referência direta para o segmento MSA (Message Acknowledgment).
+        var msa = ack.MSA;
+        // MSA-1: Define o código de confirmação como "AA" (Application Accept), indicando sucesso.
+        msa.AcknowledgmentCode.Value = "AA";
+        // MSA-2: Copia o ID de controle da mensagem original, para que o sistema de origem
+        // saiba exatamente qual mensagem estamos confirmando.
+        msa.MessageControlID.Value = terserOriginal.Get("MSH-10-1");
 
-            // 5. Preenchemos o cabeçalho (segmento MSH) da nossa resposta.
-            // A lógica aqui é "inverter o envelope" da mensagem original e
-            // gerar novas informações de controle para a nossa resposta.
-            
-            // Invertendo Remetente e Destinatário:
-            terserAck.Set("MSH-3-1", terserOriginal.Get("MSH-5-1")); // Nosso App (que era o Destinatário) agora é o Remetente.
-            terserAck.Set("MSH-4-1", terserOriginal.Get("MSH-6-1")); // Nossa Unidade (que era a Destinatária) agora é a Remetente.
-            terserAck.Set("MSH-5-1", terserOriginal.Get("MSH-3-1")); // O App original (que era o Remetente) agora é o Destinatário.
-            terserAck.Set("MSH-6-1", terserOriginal.Get("MSH-4-1")); // A Unidade original (que era a Remetente) agora é a Destinatária.
-            
-            // Gerando Informações Novas para o nosso ACK:
-            terserAck.Set("MSH-7-1", DateTime.Now.ToString("yyyyMMddHHmmss")); // MSH-7: O carimbo de tempo da nossa resposta.
-            terserAck.Set("MSH-9-1", "ACK");                                    // MSH-9: O tipo da nossa mensagem é uma Confirmação.
-            terserAck.Set("MSH-10-1", Guid.NewGuid().ToString("N").Substring(0, 20)); // MSH-10: Um novo "número de rastreio" único para nosso ACK.
-            terserAck.Set("MSH-11-1", "P");                                    // MSH-11: Estamos em ambiente de Produção.
-            terserAck.Set("MSH-12-1", "2.5.1");                                // MSH-12: Nossa resposta segue a versão 2.5.1 do HL7.
-
-            // 6. Preenchemos o segmento de status da mensagem (MSA).
-            // MSA-1: Código de confirmação. "AA" significa "Application Accept" (Sucesso).
-            terserAck.Set("MSA-1-1", "AA");
-            // MSA-2: O ID da mensagem original que estamos respondendo.
-            terserAck.Set("MSA-2-1", originalMessageControlId);
-
-            // 7. Convertemos nosso objeto ACK de volta para uma string e a retornamos.
-            return _parser.Encode(ack);
-        }
-        catch (Exception e)
-        {
-            // Se qualquer coisa deu errado, retornamos um NAK genérico construído na mão.
-            return $"MSH|^~\\&|||||{DateTime.Now:yyyyMMddHHmmss}||ACK||P|2.5.1\rMSA|AE||{e.Message}";
-        }
+        // 4. Codifica e Retorna
+        // Converte o objeto 'ack' de volta para uma string no formato HL7 e a retorna.
+        return _parser.Encode(ack);
     }
-
+    // O 'catch' é nosso plano B caso a mensagem original seja tão inválida
+    // que nem consigamos fazer o parse dela.
+    catch (Exception e)
+    {
+        // Retorna uma string de erro genérica.
+        return $"MSH|^~\\&|||||{DateTime.Now:yyyyMMddHHmmss}||ACK||P|2.5.1\rMSA|AE||{e.Message}";
+    }
+}
     // ----------------------------------------------------------------------------------
     // MÉTODO: CreateNak - Cria uma mensagem de confirmação de FALHA.
     // ----------------------------------------------------------------------------------

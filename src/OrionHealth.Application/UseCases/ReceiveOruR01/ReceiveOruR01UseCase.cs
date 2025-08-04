@@ -32,61 +32,51 @@ public class ReceiveOruR01UseCase : IReceiveOruR01UseCase
 
     // A implementação do método do nosso contrato.
     // 'async' indica que este método pode ter operações que serão "aguardadas" (await).
-    public async Task<Hl7ProcessingResult> ExecuteAsync(string hl7Message)
+   public async Task<Hl7ProcessingResult> ExecuteAsync(string hl7Message)
     {
-        // 'try...catch' é um bloco de segurança.
-        // O código dentro do 'try' é executado. Se QUALQUER erro acontecer,
-        // a execução pula para o bloco 'catch' em vez de quebrar a aplicação inteira.
         try
         {
-            // 1. Usamos nossa ferramenta de parsing para traduzir a mensagem.
-            // 'out var' é um atalho para declarar as variáveis patient e results
-            // diretamente na chamada do método.
+            // 1. Parse da mensagem (continua igual).
             _hl7Parser.ParseOruR01(hl7Message, out var patient, out var results);
 
-            // 2. Usamos a Unit of Work para acessar o repositório de pacientes.
-            // O 'await' aqui pausa a execução do método ATÉ que a consulta ao banco termine,
-            // mas libera o "garçom" (thread) para fazer outras coisas.
+            // 2. Busca pelo paciente existente (continua igual).
             var existingPatient = await _unitOfWork.Patients.FindByMrnAsync(patient.MedicalRecordNumber);
 
-            // 3. Lógica de negócio: se o paciente não existe, adicione.
+            // ### LÓGICA CORRIGIDA AQUI ###
             if (existingPatient is null)
             {
+                // Se o paciente é novo:
+                // a) Adicionamos o paciente ao contexto do EF.
                 _unitOfWork.Patients.Add(patient);
+                // b) SALVAMOS apenas o paciente primeiro para que o Oracle gere um ID.
+                await _unitOfWork.SaveChangesAsync();
+                // Agora, nosso objeto 'patient' tem o ID correto preenchido pelo banco.
             }
             else
             {
-                // Se o paciente já existe, vamos usar o objeto que veio do banco (existingPatient)
-                // e apenas atualizar seu nome, caso tenha mudado. O Entity Framework é inteligente
-                // o suficiente para detectar essa mudança.
-                // E garantimos que os novos resultados serão associados ao ID do paciente que já existe.
+                // Se o paciente já existe, atualizamos os dados e usamos o objeto existente.
                 existingPatient.FullName = patient.FullName;
                 patient = existingPatient;
             }
 
-            // 4. Adiciona todos os resultados de exame.
+            // 3. Associamos os resultados ao paciente (que agora, com certeza, tem um ID).
             foreach (var result in results)
             {
-                // Associamos cada resultado ao paciente correto.
+                // Atribuímos o ID do paciente (novo ou existente) a cada resultado.
                 result.PatientId = patient.Id;
                 _unitOfWork.ObservationResults.Add(result);
             }
 
-            // 5. O momento crucial: persistir TUDO no banco de dados.
-            // Esta é a chamada assíncrona que salva o paciente (novo ou atualizado) E
-            // todos os seus resultados em uma única transação.
+            // 4. SALVAMOS os resultados de exame.
             await _unitOfWork.SaveChangesAsync();
 
-            // 6. Se tudo até aqui deu certo, criamos uma mensagem de sucesso (ACK).
+            // 5. Geração do ACK (continua igual).
             string ackMessage = _hl7Parser.CreateAck(hl7Message);
             return new Hl7ProcessingResult(true, ackMessage);
         }
         catch (Exception ex)
         {
-            // 7. Se qualquer coisa no bloco 'try' deu errado, caímos aqui.
-            // 'ex' é um objeto que contém os detalhes do erro.
-            // Criamos uma mensagem de falha (NAK) com a mensagem de erro.
-            // (Em um sistema real, poderíamos logar o erro completo 'ex' para investigação).
+            // Tratamento de erro (continua igual).
             string nakMessage = _hl7Parser.CreateNak(hl7Message, ex.Message);
             return new Hl7ProcessingResult(false, nakMessage);
         }

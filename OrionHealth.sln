@@ -15,6 +15,10 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrionHealth.Worker", "src\O
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrionHealth.CrossCutting", "src\OrionHealth.CrossCutting\OrionHealth.CrossCutting.csproj", "{256484DD-B8F2-4A72-B7EF-AC9CE15770F3}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "test", "test", "{0C88DD14-F956-CE84-757C-A364CCF449FC}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "OrionHealth.TestClient", "test\OrionHealth.TestClient\OrionHealth.TestClient.csproj", "{9CE41F28-FFFA-4B2F-BD0B-A5F100F2D5A9}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -85,6 +89,18 @@ Global
 		{256484DD-B8F2-4A72-B7EF-AC9CE15770F3}.Release|x64.Build.0 = Release|Any CPU
 		{256484DD-B8F2-4A72-B7EF-AC9CE15770F3}.Release|x86.ActiveCfg = Release|Any CPU
 		{256484DD-B8F2-4A72-B7EF-AC9CE15770F3}.Release|x86.Build.0 = Release|Any CPU
+		{9CE41F28-FFFA-4B2F-BD0B-A5F100F2D5A9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9CE41F28-FFFA-4B2F-BD0B-A5F100F2D5A9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9CE41F28-FFFA-4B2F-BD0B-A5F100F2D5A9}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{9CE41F28-FFFA-4B2F-BD0B-A5F100F2D5A9}.Debug|x64.Build.0 = Debug|Any CPU
+		{9CE41F28-FFFA-4B2F-BD0B-A5F100F2D5A9}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{9CE41F28-FFFA-4B2F-BD0B-A5F100F2D5A9}.Debug|x86.Build.0 = Debug|Any CPU
+		{9CE41F28-FFFA-4B2F-BD0B-A5F100F2D5A9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9CE41F28-FFFA-4B2F-BD0B-A5F100F2D5A9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9CE41F28-FFFA-4B2F-BD0B-A5F100F2D5A9}.Release|x64.ActiveCfg = Release|Any CPU
+		{9CE41F28-FFFA-4B2F-BD0B-A5F100F2D5A9}.Release|x64.Build.0 = Release|Any CPU
+		{9CE41F28-FFFA-4B2F-BD0B-A5F100F2D5A9}.Release|x86.ActiveCfg = Release|Any CPU
+		{9CE41F28-FFFA-4B2F-BD0B-A5F100F2D5A9}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -95,5 +111,6 @@ Global
 		{89EB18C1-B74A-4A50-A258-AC5FD8AB363C} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{F7833B69-BA07-4123-9CEF-992ABB8E8F02} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{256484DD-B8F2-4A72-B7EF-AC9CE15770F3} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{9CE41F28-FFFA-4B2F-BD0B-A5F100F2D5A9} = {0C88DD14-F956-CE84-757C-A364CCF449FC}
 	EndGlobalSection
 EndGlobal
